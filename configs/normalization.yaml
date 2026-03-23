@@ -1,0 +1,15 @@
+# Conservative normalization defaults for making logs more comparable without
+# erasing the evidence needed for human debugging.
+tokens:
+  replace_ip_addresses: true
+  replace_hex_values: true
+  replace_uuid_values: true
+  replace_numeric_runs: false
+  replace_file_paths: false
+
+placeholders:
+  ip_address: "<IP>"
+  hex_value: "<HEX>"
+  uuid_value: "<UUID>"
+  numeric_value: "<NUM>"
+  file_path: "<PATH>"
