@@ -1,0 +1,3 @@
+2026-03-30T10:15:05Z INFO [scheduler] assigned job 42 to node03
+2026-03-30 10:15:09,120 ERROR [scheduler] failed to open /var/log/jobs/run_042.log
+Mar 30 10:15:10 WARNING [scheduler] node node03 reported uuid 123e4567-e89b-12d3-a456-426614174000
