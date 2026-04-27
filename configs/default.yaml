@@ -1,22 +1,6 @@
-# Global application defaults for the local, batch-oriented MVP.
+# Global defaults for the current local, batch-oriented MVP.
 app_name: ClusterSage
 environment: development
-data_root: data
-raw_data_dir: data/raw
-processed_data_dir: data/processed
-reports_dir: data/reports
 duckdb_path: data/processed/clustersage.duckdb
 normalization_config: configs/normalization.yaml
-scoring_config: configs/scoring.yaml
-
-api:
-  host: 127.0.0.1
-  port: 8000
-
-pipeline:
-  # Preserve original log text so every downstream artifact can be traced back
-  # to source evidence.
-  preserve_raw_text: true
-  # LLM-assisted reporting is optional and disabled by default. The core MVP
-  # should remain useful without it.
-  enable_llm_reports: false
+eval_config: configs/eval.yaml

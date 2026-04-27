@@ -9,11 +9,12 @@ from pathlib import Path
 
 import typer
 
-from app.core.config import get_settings
-from app.ingest.loader import load_log_records
-from app.models.db import connect, initialize_database, insert_log_records
-from app.models.schemas import IngestSummary, LogRecord
-from app.normalize.canonicalize import TextNormalizer
+from app.config import get_settings
+from app.eval.benchmark import run_benchmark
+from app.ingest import load_log_records
+from app.normalize import TextNormalizer
+from app.schemas import IngestSummary
+from app.storage import connect, initialize_database, insert_log_records
 
 app = typer.Typer(help="ClusterSage command line interface.")
 
@@ -38,12 +39,15 @@ def ingest(
 ) -> None:
     """Recursively ingest logs, normalize them, and persist them to DuckDB."""
     settings = get_settings()
-    normalization_config = settings.load_yaml_config().get("normalization_config", "configs/normalization.yaml")
+    normalization_config = settings.load_yaml_config().get(
+        "normalization_config",
+        "configs/normalization.yaml",
+    )
     normalizer = TextNormalizer.from_yaml(settings.resolved_path(Path(normalization_config)))
 
-    files, raw_records = load_log_records(path=path, job_id=job_id) if False else load_log_records(root_path=path, job_id=job_id)
+    files, raw_records = load_log_records(root_path=path, job_id=job_id)
     records = [
-        LogRecord(**record.model_dump(), normalized_text=normalizer.normalize(record.raw_text))
+        record.model_copy(update={"normalized_text": normalizer.normalize(record.raw_text)})
         for record in raw_records
     ]
 
@@ -62,6 +66,53 @@ def ingest(
     typer.echo(f"Log lines ingested: {summary.log_lines_ingested}")
     typer.echo(f"Normalized records written: {summary.records_written}")
     typer.echo(f"Database path: {summary.database_path}")
+
+
+@app.command()
+def benchmark(
+    dataset_path: Path,
+    mode: str = typer.Option("auto", help="Dataset mode: auto, local, or synthetic."),
+    perturb: bool = typer.Option(False, help="Benchmark perturbed variants of the dataset."),
+    seed: int = typer.Option(7, help="Seed for deterministic perturbation."),
+) -> None:
+    """Run the lightweight evaluation harness and write benchmark reports."""
+    settings = get_settings()
+    project_config = settings.load_yaml_config()
+    normalization_config = project_config.get("normalization_config", "configs/normalization.yaml")
+    eval_config_path = Path(project_config.get("eval_config", "configs/eval.yaml"))
+    eval_config = settings.load_yaml_config(eval_config_path)
+
+    normalizer = TextNormalizer.from_yaml(settings.resolved_path(Path(normalization_config)))
+    report_dir = settings.resolved_path(Path(eval_config.get("report_dir", "data/reports/benchmarks")))
+    result = run_benchmark(
+        dataset_path=dataset_path,
+        normalizer=normalizer,
+        mode=mode,
+        report_dir=report_dir,
+        max_examples=int(eval_config.get("max_examples", 5)),
+        perturb=perturb,
+        seed=seed,
+    )
+
+    typer.echo(f"Dataset: {result['dataset']['name']}")
+    typer.echo(f"Dataset type: {result['dataset']['dataset_type']}")
+    typer.echo(f"Record count: {result['dataset']['record_count']}")
+    typer.echo(
+        "Normalization changed: "
+        f"{result['normalization']['changed_lines']} / {result['normalization']['total_lines']} "
+        f"({result['normalization']['percent_changed']}%)"
+    )
+    for method in result["methods"]:
+        metrics = method["metrics"]
+        typer.echo(f"Method: {method['method']}")
+        typer.echo(f"  predicted templates: {metrics['predicted_template_count']}")
+        typer.echo(f"  expected templates: {metrics['expected_template_count']}")
+        typer.echo(f"  exact template match rate: {metrics['exact_template_match_rate']}")
+        typer.echo(f"  grouping pair accuracy: {metrics['grouping_pair_accuracy']}")
+        typer.echo(f"  over-splitting pairs: {metrics['over_splitting_pairs']}")
+        typer.echo(f"  over-merging pairs: {metrics['over_merging_pairs']}")
+    typer.echo(f"JSON report: {result['report_paths']['json']}")
+    typer.echo(f"Markdown report: {result['report_paths']['markdown']}")
 
 
 if __name__ == "__main__":

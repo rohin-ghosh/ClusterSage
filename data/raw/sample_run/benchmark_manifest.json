@@ -1,0 +1,36 @@
+{
+  "name": "sample_run_synthetic_eval",
+  "records": [
+    {
+      "file": "scheduler_node01.txt",
+      "line_number": 1,
+      "expected_group_id": "assign"
+    },
+    {
+      "file": "scheduler_node01.txt",
+      "line_number": 2,
+      "expected_group_id": "file_open_error"
+    },
+    {
+      "file": "scheduler_node01.txt",
+      "line_number": 3,
+      "expected_group_id": "uuid_warning"
+    },
+    {
+      "file": "trainer_node03.log",
+      "line_number": 1,
+      "expected_group_id": "timeout",
+      "expected_template": "2026-03-30 10:15:00 ERROR [rdma] link timeout after <DURATION> to <IP>"
+    },
+    {
+      "file": "trainer_node03.log",
+      "line_number": 2,
+      "expected_group_id": "retry"
+    },
+    {
+      "file": "trainer_node03.log",
+      "line_number": 3,
+      "expected_group_id": "plain_status"
+    }
+  ]
+}

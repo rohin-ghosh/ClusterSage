@@ -1,0 +1,33 @@
+{
+  "name": "sample_parser_eval",
+  "records": [
+    {
+      "line_index": 1,
+      "expected_group_id": "timeout",
+      "expected_template": "ERROR [rdma] link timeout after <DURATION> to <IP>"
+    },
+    {
+      "line_index": 2,
+      "expected_group_id": "timeout",
+      "expected_template": "ERROR [rdma] link timeout after <DURATION> to <IP>"
+    },
+    {
+      "line_index": 3,
+      "expected_group_id": "retry",
+      "expected_template": "WARN [trainer] retrying request_id=<ID>"
+    },
+    {
+      "line_index": 4,
+      "expected_group_id": "retry",
+      "expected_template": "WARN [trainer] retrying request_id=<ID>"
+    },
+    {
+      "line_index": 5,
+      "expected_group_id": "assign"
+    },
+    {
+      "line_index": 6,
+      "expected_group_id": "assign"
+    }
+  ]
+}

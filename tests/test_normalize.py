@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from app.normalize.canonicalize import TextNormalizer
+from app.normalize import TextNormalizer
 
 
 def test_normalize_major_token_classes() -> None:

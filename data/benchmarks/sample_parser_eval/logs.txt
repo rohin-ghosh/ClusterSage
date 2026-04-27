@@ -1,0 +1,6 @@
+ERROR [rdma] link timeout after 3000 ms to 10.0.0.5
+ERROR [rdma] link timeout after 4500 ms to 10.0.0.9
+WARN [trainer] retrying request_id=abc123def456ghi789
+WARN [trainer] retrying request_id=xyz987uvw654rst321
+INFO [scheduler] assigned job 42 to node03
+INFO [scheduler] assigned job 99 to node07

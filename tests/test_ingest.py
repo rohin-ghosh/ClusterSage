@@ -2,8 +2,7 @@
 
 from pathlib import Path
 
-from app.ingest.loader import discover_log_files, load_log_records
-from app.ingest.metadata import infer_source_and_host
+from app.ingest import discover_log_files, infer_source_and_host, load_log_records
 
 
 def test_recursive_file_loading(tmp_path: Path) -> None:

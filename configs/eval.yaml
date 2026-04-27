@@ -1,0 +1,10 @@
+# Defaults for the lightweight benchmark and evaluation layer.
+report_dir: data/reports/benchmarks
+max_examples: 5
+methods:
+  - normalized_identity
+  - token_pattern
+
+perturbation:
+  enabled_by_default: false
+  seed: 7
