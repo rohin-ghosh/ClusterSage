@@ -1,85 +1,129 @@
 # ClusterSage
 
-ClusterSage is a Python log-triage tool for distributed compute environments, with an initial emphasis on GPU-cluster style systems. In practical terms, it is a local pipeline for taking a directory of messy logs, turning each non-blank line into a structured record, normalizing unstable tokens, and storing the result in DuckDB so the run becomes easier to inspect.
+## Status  
+  
+Early prototype. Currently implements:  
+- log discovery and ingestion  
+- lightweight metadata extraction  
+- timestamp/severity/component parsing  
+- regex-based normalization  
+- DuckDB persistence  
+- Typer CLI  
+- basic synthetic sample logs/tests  
+  
+Next: template extraction, anomaly scoring, incident grouping, and agentic triage.
 
-The project is intentionally conservative. It is not trying to diagnose failures autonomously or replace engineering judgment. Its current job is to make raw logs more legible, more comparable, and easier to query so a human can see recurring patterns and inspect suspicious behavior with less manual cleanup.
 
-This repository is meant to work in two roles at once:
 
-- as a usable engineering tool for early incident and run analysis
-- as a clean foundation for later research in log parsing, anomaly detection, incident grouping, and cluster debugging workflows
+## Minimal Example
 
-## Current Implemented Stage
+Raw log:
 
-The current implemented layer is **ingestion + normalization**.
+```text
 
-Today, ClusterSage can:
+2026-04-25 14:03:22 node03 [NCCL] WARN timeout connecting to 10.2.4.81:443 after 12000ms
 
-- recursively load `.log` and `.txt` files from a directory
-- skip blank lines and preserve the original line text
-- infer lightweight metadata from filenames such as `trainer_node03.log`
-- attempt to parse timestamps from common log formats at the start of a line
-- infer coarse fields such as severity and bracketed component labels
-- normalize unstable tokens using regex rules loaded from YAML
-- persist the processed records into a simple DuckDB table
-- run the full flow through a Typer CLI command
+Output:
 
-That is the first practical milestone for the project: get raw logs into a structured, inspectable form before moving on to higher-level grouping or ranking.
+{
 
-## What ClusterSage Is Trying To Solve
+  "timestamp": "2026-04-25T14:03:22",
 
-Raw infrastructure logs are often difficult to use directly:
+  "host": "node03",
 
-- the same event appears many times with small textual variations
-- identifiers such as IP addresses, UUIDs, ports, counters, job IDs, and paths create noise
-- timestamps may be missing or inconsistent
-- important lines are buried inside repetitive boilerplate
-- evidence is spread across multiple files and components
+  "component": "NCCL",
 
-In GPU and cluster environments, this problem gets sharper. A single run may involve scheduler logs, trainer logs, node-level logs, transport or interconnect messages, and device-specific traces. Even when the evidence is present, it is not naturally readable as a coherent incident.
+  "severity": "WARN",
 
-ClusterSage starts by making that evidence easier to work with.
+  "normalized_text": "<TIMESTAMP> node<INT> [NCCL] WARN timeout connecting to <IP>:<PORT> after <DURATION>"
 
-## Current Pipeline
+}
 
-The current pipeline is straightforward:
 
-1. Recursively discover `.log` and `.txt` files under a target directory.
-2. Read each file line by line.
-3. Skip blank lines.
-4. Infer `source` and `host` from filename patterns when possible.
-5. Parse a timestamp from the start of the line when it matches a supported format.
-6. Infer lightweight fields such as `severity` and `component` when obvious.
-7. Normalize unstable tokens using ordered regex replacement rules from `configs/normalization.yaml`.
-8. Persist the resulting records into DuckDB.
 
-This is intentionally simple. The point of the current implementation is reliable data preparation, not sophisticated interpretation.
+ClusterSage is a small Python log-triage tool for distributed compute and GPU-cluster style environments. Its current job is focused and practical: ingest messy log files, normalize unstable tokens, store the resulting records in DuckDB, and run a lightweight benchmark harness so changes can be evaluated instead of guessed at.
 
-## Canonical Log Schema
+It is not an autonomous debugging agent. It does not do incident diagnosis, anomaly detection, remediation, or LLM-assisted analysis. The project is intentionally kept narrow so one developer can understand the whole current system in one sitting.
 
-Each processed log line is represented as a single record with the following high-level fields:
+## Current Scope
 
-- `id`: stable per-record identifier
-- `timestamp`: parsed timestamp when present, otherwise `null`
-- `source`: coarse source inferred from the filename when possible
-- `host`: host inferred from the filename when possible
-- `job_id`: optional run or job identifier supplied through the CLI
-- `severity`: coarse severity token such as `INFO`, `WARN`, or `ERROR`
-- `component`: lightweight component label when it can be inferred
-- `raw_text`: original log line
-- `normalized_text`: canonicalized form of the same line
-- `file_path`: path to the source file
-- `line_number`: original line number within the file
+ClusterSage currently supports:
 
-This schema is deliberately narrow. It keeps the first storage layer inspectable while preserving enough context for later stages.
+- recursive ingestion of `.log` and `.txt` files
+- simple metadata inference from filenames such as `trainer_node03.log`
+- timestamp, severity, and bracketed-component parsing when obvious
+- regex-based normalization from `configs/normalization.yaml`
+- DuckDB persistence for raw and normalized records
+- lightweight evaluation of normalization and grouping baselines
+- a Typer CLI for the two working commands: `ingest` and `benchmark`
 
-## Why Normalization Exists
+Everything else is deliberately out of scope for now.
 
-Normalization is the step that makes recurring patterns visible.
+## Architecture
 
-Without normalization, two lines that describe the same event may look different because they contain unstable values such as IP addresses, UUIDs, counters, durations, paths, or long request identifiers. That makes simple grouping and comparison much harder than it needs to be.
+The active code is organized around the current working pipeline:
 
-ClusterSage currently uses regex-based rules loaded from [configs/normalization.yaml](/Users/rohinghosh/Desktop/Projects/NVlog/clustersage/configs/normalization.yaml) to replace major token classes with readable placeholders such as:
+```text
+app/
+├── cli.py          # Typer commands for ingest and benchmark
+├── config.py       # small settings/YAML helpers
+├── schemas.py      # shared Pydantic records
+├── storage.py      # DuckDB table creation and writes
+├── ingest/         # file discovery, line parsing, metadata inference
+├── normalize/      # YAML-driven regex normalization
+└── eval/           # datasets, baselines, metrics, perturbation, reports
+```
+
+This is intentionally smaller than the original scaffold. Modules that only described future work, such as incidents, scoring, LLM integration, API routes, and report rendering, have been removed until there is real behavior to justify them.
+
+## Ingestion
+
+The ingest flow takes a directory or file path and:
+
+1. finds `.log` and `.txt` files recursively
+2. skips blank lines
+3. infers `source` and `host` from simple filename patterns
+4. parses common timestamp formats at the start of a line
+5. infers `severity` and bracketed `component` labels when present
+6. preserves the original line as `raw_text`
+7. writes records to DuckDB after normalization
+
+Example:
+
+```bash
+python -m app.cli ingest ./data/raw/sample_run --job-id run_042
+```
+
+Expected output includes:
+
+- files processed
+- log lines ingested
+- normalized records written
+- database path
+
+## Canonical Record
+
+Each ingested line is represented as a `LogRecord` with:
+
+- `id`
+- `timestamp`
+- `source`
+- `host`
+- `job_id`
+- `severity`
+- `component`
+- `line_number`
+- `raw_text`
+- `normalized_text`
+- `file_path`
+
+The schema is intentionally plain. It keeps the raw evidence and the normalized form together without pretending to solve higher-level debugging yet.
+
+## Normalization
+
+Normalization is the step that makes repeated event shapes easier to see. The current normalizer applies ordered regex rules from `configs/normalization.yaml` and replaces unstable tokens with readable placeholders.
+
+Examples of supported placeholders:
 
 - `<IP>`
 - `<UUID>`
@@ -90,19 +134,72 @@ ClusterSage currently uses regex-based rules loaded from [configs/normalization.
 - `<PATH>`
 - `<ID>`
 
-The goal is not to erase detail. The goal is to preserve the original line in `raw_text` while producing a deterministic `normalized_text` that makes repeated event shapes easier to spot.
+The goal is not to erase information. The raw line is always preserved, and `normalized_text` is used as a cleaner comparison surface for evaluation and later template work.
 
-## Storage Model
+## Storage
 
-Processed records are written into a local DuckDB database at the configured path, which defaults to `data/processed/clustersage.duckdb`.
+Records are stored in DuckDB at:
 
-The storage layer is intentionally minimal:
+```text
+data/processed/clustersage.duckdb
+```
 
-- one inspectable `log_records` table
-- raw and normalized text stored together
-- no heavy orchestration or service requirements
+The current database has one main table:
 
-This keeps the current stage useful for local debugging and easy to evaluate in a research setting.
+```text
+log_records
+```
+
+This is enough for local inspection and avoids introducing service infrastructure before the tool needs it.
+
+## Evaluation
+
+The benchmark layer gives concrete feedback on preprocessing and grouping behavior. It exists because normalization quality can otherwise become too subjective.
+
+Benchmark datasets can be either:
+
+- local labeled datasets with `logs.txt` and `labels.json`
+- synthetic sample-run logs with an optional `benchmark_manifest.json`
+
+Seed dataset:
+
+```text
+data/benchmarks/sample_parser_eval/
+├── logs.txt
+└── labels.json
+```
+
+Run it with:
+
+```bash
+python -m app.cli benchmark ./data/benchmarks/sample_parser_eval
+```
+
+Run the synthetic sample logs with:
+
+```bash
+python -m app.cli benchmark ./data/raw/sample_run --mode synthetic
+```
+
+The benchmark currently reports:
+
+- lines changed by normalization
+- percent of lines changed
+- replacement counts by normalization rule
+- before/after examples
+- exact template match rate when expected templates exist
+- grouping pair accuracy when expected groups exist
+- predicted vs expected template counts
+- over-splitting and over-merging indicators
+- concrete failure examples
+
+Reports are written to:
+
+```text
+data/reports/benchmarks/
+```
+
+Each run writes a JSON report and a Markdown report.
 
 ## Setup
 
@@ -112,66 +209,57 @@ From the repository root:
 cd clustersage
 python -m venv .venv
 source .venv/bin/activate
-pip install -e .[dev]
+python -m pip install -e '.[dev]'
 ```
 
-The CLI and tests assume you run commands from the `clustersage/` project root so that local config and data paths resolve cleanly.
+Use `python -m ...` while developing so commands run inside the active virtual environment.
 
-## Example Usage
+## Common Commands
 
-ClusterSage ships with small synthetic logs under `data/raw/sample_run/`, so the ingest path can be exercised immediately.
+Run ingestion:
 
 ```bash
-cd clustersage
-clustersage ingest ./data/raw/sample_run --job-id run_042
+python -m app.cli ingest ./data/raw/sample_run --job-id run_042
 ```
 
-Expected behavior:
+Run the benchmark:
 
-- discover supported log files recursively
-- parse and normalize their contents
-- write records to DuckDB
-- print a concise summary including file count, line count, record count, and database path
+```bash
+python -m app.cli benchmark ./data/benchmarks/sample_parser_eval
+```
 
-## Repository Structure
+Run tests:
 
-The repository is divided by pipeline responsibility rather than by framework concern:
+```bash
+python -m pytest
+```
 
-- `app/ingest/` handles file discovery, line loading, metadata inference, and timestamp parsing
-- `app/normalize/` handles YAML-driven regex normalization
-- `app/models/` defines record schemas and DuckDB persistence helpers
-- `app/cli.py` exposes the batch workflow through Typer
-- `configs/` stores readable defaults and normalization rules
-- `data/` holds raw samples, processed outputs, and future reports
-- `tests/` covers the current ingest and normalization behavior
+Inspect stored records:
 
-This modularity is practical. Ingestion, normalization, storage, and later analysis stages will evolve at different speeds. Keeping those seams explicit makes the code easier to test, easier to extend, and easier for a collaborator to review quickly.
+```bash
+python - <<'PY'
+import duckdb
 
-## Next Planned Stages
+con = duckdb.connect("data/processed/clustersage.duckdb")
+rows = con.execute("""
+    select source, host, job_id, raw_text, normalized_text
+    from log_records
+    order by file_path, line_number
+    limit 10
+""").fetchall()
 
-The current implementation stops after ingestion and normalization. The next planned stages are:
+for row in rows:
+    print(row)
+PY
+```
 
-- **Template extraction**: group normalized lines into recurring event shapes
-- **Scoring**: rank unusual templates or time windows using simple heuristic signals
-- **Incidents**: cluster related suspicious windows into draft incidents
-- **Reporting**: render concise evidence-backed summaries for human review
+## What Comes Next
 
-Those stages are already represented in the repository structure, but they are not the focus of the current implementation yet.
+The next useful stage is not a bigger architecture. It is better behavior inside the small architecture:
 
-## Why This Structure Also Works As A Research Artifact
+- tune normalization so timestamps and useful structure are preserved
+- improve simple grouping/template behavior
+- add benchmark cases from real or public cluster logs
+- compare changes through the existing benchmark reports
 
-The current codebase is useful beyond the immediate engineering workflow because it creates clean interfaces between stages:
-
-- raw input and structured records are separated
-- normalization rules are explicit and inspectable
-- persisted outputs are queryable in DuckDB
-- later components can be evaluated against stable intermediate artifacts
-
-That matters for research and collaboration. A professor or collaborator should be able to skim the repository and see a clear progression:
-
-1. make logs usable
-2. define stable intermediate representations
-3. add stronger grouping and ranking methods later
-4. evaluate improvements stage by stage instead of treating the system as a black box
-
-This is the main reason ClusterSage stays modular. The engineering tool and the research artifact benefit from the same discipline: explicit data flow, readable heuristics, and inspectable outputs.
+Incident clustering, scoring, richer reports, API work, and LLM support should wait until the preprocessing and evaluation layer is strong enough to justify them.
