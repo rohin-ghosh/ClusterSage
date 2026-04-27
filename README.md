@@ -1,19 +1,18 @@
 # ClusterSage
 
-## Status  
-  
+## Status
+
 Early prototype. Currently implements:  
+
 - log discovery and ingestion  
 - lightweight metadata extraction  
 - timestamp/severity/component parsing  
 - regex-based normalization  
 - DuckDB persistence  
 - Typer CLI  
-- basic synthetic sample logs/tests  
-  
+- basic synthetic sample logs/tests
+
 Next: template extraction, anomaly scoring, incident grouping, and agentic triage.
-
-
 
 ## Minimal Example
 
@@ -121,7 +120,7 @@ The schema is intentionally plain. It keeps the raw evidence and the normalized 
 
 ## Normalization
 
-Normalization is the step that makes repeated event shapes easier to see. The current normalizer applies ordered regex rules from `configs/normalization.yaml` and replaces unstable tokens with readable placeholders.
+Normalization is the step that makes repeated event shapes easier to see. The current normalizer applies ordered regex rules from [configs/normalization.yaml](configs/normalization.yaml) and replaces unstable tokens with readable placeholders.
 
 Examples of supported placeholders:
 
